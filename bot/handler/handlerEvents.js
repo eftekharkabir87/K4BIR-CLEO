@@ -151,7 +151,43 @@ module.exports = function (api, threadModel, userModel, globalModel, usersData, 
 
 		// Check if has threadID
 		if (!threadID)
-			return;
+			return; 
+		// =======================
+// FIX USER MENTIONS We Wasn't Parsing The File <=
+// =======================
+try {
+	if (!event.mentions || typeof event.mentions !== "object")
+		event.mentions = {};
+
+	let mentionIDs = Object.keys(event.mentions);
+
+	// If user replied to a message but didn't @mention
+	if (mentionIDs.length === 0 && event.messageReply?.senderID) {
+		event.mentions = { [event.messageReply.senderID]: "" };
+	}
+	// Fallback for text-based @name mention
+	else if (mentionIDs.length === 0 && typeof body === "string") {
+		const tagMatch = body.match(/@([^@\s]+)/);
+		if (tagMatch) {
+			const tagName = tagMatch[1].toLowerCase();
+			const info = await api.getThreadInfo(threadID);
+
+			if (info?.participantIDs?.length) {
+				for (const uid of info.participantIDs) {
+					const userInfo = await api.getUserInfo(uid);
+					const name = userInfo[uid]?.name?.toLowerCase();
+					if (name && name.includes(tagName)) {
+						event.mentions = { [uid]: "" };
+						break;
+					}
+				}
+			}
+		}
+	}
+}
+catch (e) {
+	console.log("[MENTION FIX ERROR]", e);
+	}
 
 		const senderID = event.userID || event.senderID || event.author;
 
